@@ -10,24 +10,28 @@ namespace Jacere.ConsoleCredentials
     public class CredentialStorage
     {
         private static ICredentialSource _source;
-        private static Func<string> _getPersistentSecretKey;
+        private static IPersistentKeySource _persistentKeySource;
 
         private readonly string[] _groupsEncrypted;
         private readonly Dictionary<string, string> _groupDict;
 
         private string _secretKey;
 
-        public static void Register(ICredentialSource source, Func<string> getPersistentSecretKey = null)
+        public static void Use(ICredentialSource source)
         {
             _source = source;
-            _getPersistentSecretKey = getPersistentSecretKey;
+        }
+
+        public static void Use(IPersistentKeySource persistentKeySource)
+        {
+            _persistentKeySource = persistentKeySource;
         }
 
         public static void CreatePassword()
         {
-            if (_getPersistentSecretKey?.Invoke() != null)
+            if (_persistentKeySource != null && _persistentKeySource.HasKey())
             {
-                throw new Exception("cannot create new key when persistent key is being used");
+                throw new Exception("cannot create new key when persistent key is available");
             }
 
             var newSecretKey = AcquireNewSecretKey();
@@ -48,7 +52,7 @@ namespace Jacere.ConsoleCredentials
 
         public static CredentialStorage Open()
         {
-            var persistentKey = _getPersistentSecretKey?.Invoke();
+            var persistentKey = _persistentKeySource?.Get();
 
             var key = persistentKey ?? AcquireSecretKey();
 
@@ -145,11 +149,6 @@ namespace Jacere.ConsoleCredentials
 
         public void UpdateSecretKey()
         {
-            if (_getPersistentSecretKey?.Invoke() != null)
-            {
-                throw new Exception("persistent key cannot be changed this way");
-            }
-
             var newSecretKey = AcquireNewSecretKey();
             UpdateSecretKey(newSecretKey);
         }
